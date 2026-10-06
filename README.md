@@ -8,6 +8,30 @@ The project transforms raw nested GA4 event data into session-level analytical t
 
 [View the interactive Power BI dashboard](https://app.powerbi.com/view?r=eyJrIjoiNzE3MjI1YmQtMDBmMy00MjBhLWE5NDctOTgzNGJjNDgwN2YzIiwidCI6IjllMTc5Yjg3LTBhMTYtNDUwZC05MDgwLWIxMTBhNTJlZTE3MiJ9)
 
+## Executive Summary
+
+The analysis found that **customer value is driven much more by returning behaviour than by traffic volume alone**.
+
+### Key Findings at a Glance
+
+- **Returning users convert 4.6x better than new users**, with conversion rates of **3.10% vs 0.68%**.
+- Returning users represent only **27.5% of sessions but generate 66.41% of total revenue**.
+- Revenue per session is approximately **5.2x higher for returning users**, at **$2.43 vs $0.47**.
+- Only **8.19% of purchasers make another purchase**, with **91.8% purchasing only once**.
+- Exact-day retention is low at **0.68% on Day 7** and **0.14% on Day 30**.
+- Acquisition quality varies by channel: **Organic Search drives the most traffic**, while **Referral shows stronger downstream conversion and retention performance**.
+
+### Recommended Actions
+
+- Prioritise **first-time visitor conversion** by investigating friction in checkout and payment.
+- Strengthen **post-visit and post-purchase re-engagement** to encourage users to return.
+- Focus on improving the **first-to-second purchase transition**, given the low repeat purchaser rate.
+- Investigate the individual referral sources driving strong customer quality and assess opportunities to scale them.
+- Evaluate Organic Search using **conversion, revenue and retention**, not traffic volume alone.
+- Treat unusually strong rates from small channels cautiously until more data is available.
+
+> **Core opportunity:** improve the transition from **first visit to return visit, and from first purchase to repeat purchase**, while evaluating acquisition channels based on downstream customer value rather than traffic volume alone.
+
 ## Project Overview
 
 The goal of this project was to move beyond basic website reporting and answer commercially useful questions about the quality of traffic being acquired.
