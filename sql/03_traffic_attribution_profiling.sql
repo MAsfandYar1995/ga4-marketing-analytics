@@ -1,479 +1,415 @@
 /*
-GA4 Marketing Analytics Portfolio Project
-Dataset: Google Analytics 4 obfuscated sample ecommerce
-Analysis window: 2020-11-01 to 2021-01-31
-SQL dialect: GoogleSQL (BigQuery)
-*/
-
-/*
+Analysis: Traffic Attribution Profiling
 Purpose:
-- Profile source, medium and campaign fields.
-- Assess traffic-parameter completeness.
-- Test first non-null session attribution logic.
+Inspect the traffic acquisition fields available in the raw GA4 dataset
+before building the session-level acquisition model.
+
+Checks include:
+- User acquisition source / medium / campaign values
+- Event-level source / medium / campaign values
+- Traffic-field completeness by event type
+- Whether source, medium and campaign appear together
+- Session-level attribution coverage using the first valid traffic event
+
+Dataset:
+bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*
+
+Analysis period:
+2020-11-01 to 2021-01-31
+
+Note:
+GA4 traffic_source fields describe user acquisition traffic, while
+source / medium / campaign extracted from event_params are used here
+to investigate session-level attribution.
 */
 
-FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
 
-WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131';
+-- ============================================================
+-- 1. USER ACQUISITION MEDIUM VALUES
+-- ============================================================
 
-\-- organic, (none), \<Other>, referral, (data deleted), cpc
-
-
-SELECT
-
-  DISTINCT traffic_source.source AS source
-
-FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
-
-WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131';
-
-\-- google, (direct), \<Other>, (data deleted), shop.googlemerchandisestore.com
+SELECT DISTINCT
+    traffic_source.medium AS acquisition_medium
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+ORDER BY acquisition_medium;
 
 
-SELECT
 
-  DISTINCT traffic_source.name AS name
+-- ============================================================
+-- 2. USER ACQUISITION SOURCE VALUES
+-- ============================================================
 
-FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
-
-WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131';
-
-\-- (organic), (direct), \<other>, (referral), (data deleted)
-
-
-SELECT
-
-  DISTINCT (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source') AS source
-
-FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
-
-WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131';
+SELECT DISTINCT
+    traffic_source.source AS acquisition_source
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+ORDER BY acquisition_source;
 
 
-\-- 242 sources
+
+-- ============================================================
+-- 3. USER ACQUISITION CAMPAIGN VALUES
+-- ============================================================
+
+SELECT DISTINCT
+    traffic_source.name AS acquisition_campaign
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+ORDER BY acquisition_campaign;
 
 
-SELECT
 
-  DISTINCT ep.value.string_value
+-- ============================================================
+-- 4. EVENT-LEVEL SOURCE VALUES
+-- ============================================================
 
-FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`,
-
-UNNEST(event_params) AS ep
-
-WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
-
-AND key = 'campaign';
-
-
-\-- 12 campaigns
-
-
-SELECT
-
-  DISTINCT ep.value.string_value
-
-FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`,
-
-UNNEST(event_params) AS ep
-
-WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
-
-AND key = 'medium';
+SELECT DISTINCT
+    (
+        SELECT value.string_value
+        FROM UNNEST(event_params)
+        WHERE key = 'source'
+    ) AS event_source
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+ORDER BY event_source;
 
 
-\-- referral, \<Other>, organic, (none), cpc, (data deleted), affiliate, email, (none)
+
+-- ============================================================
+-- 5. EVENT-LEVEL MEDIUM VALUES
+-- ============================================================
+
+SELECT DISTINCT
+    (
+        SELECT value.string_value
+        FROM UNNEST(event_params)
+        WHERE key = 'medium'
+    ) AS event_medium
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+ORDER BY event_medium;
 
 
-\-- For each event_name, return: total number of events, number of events where source is non-null, number where medium is non-null
 
-\-- number where campaign is non-null, percentage of events with a non-null source
+-- ============================================================
+-- 6. EVENT-LEVEL CAMPAIGN VALUES
+-- ============================================================
 
+SELECT DISTINCT
+    (
+        SELECT value.string_value
+        FROM UNNEST(event_params)
+        WHERE key = 'campaign'
+    ) AS event_campaign
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+ORDER BY event_campaign;
+
+
+
+-- ============================================================
+-- 7. TRAFFIC-FIELD COMPLETENESS BY EVENT TYPE
+-- ============================================================
 
 WITH events_base AS (
 
+    SELECT
+        event_name,
 
-  SELECT
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'source'
+        ) AS event_source,
 
-    event_name,
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'medium'
+        ) AS event_medium,
 
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source') AS event_source,
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'campaign'
+        ) AS event_campaign
 
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign') AS event_campaign,
+    FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
 
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'medium') AS event_medium
-
-  FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
-
-  WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
-
-
+    WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
 )
 
-
 SELECT
+    event_name,
+    COUNT(*) AS total_events,
 
-  event_name,
+    COUNTIF(event_source IS NOT NULL)
+        AS events_with_source,
 
-  COUNT(\*) AS total_events,
+    COUNTIF(event_medium IS NOT NULL)
+        AS events_with_medium,
 
-  SUM(CASE WHEN event_source IS NOT NULL THEN 1 ELSE 0 END) AS non_null_source_events,
+    COUNTIF(event_campaign IS NOT NULL)
+        AS events_with_campaign,
 
-  SUM(CASE WHEN event_medium IS NOT NULL THEN 1 ELSE 0 END) AS non_null_medium_events,
+    ROUND(
+        SAFE_DIVIDE(
+            COUNTIF(event_source IS NOT NULL),
+            COUNT(*)
+        ) * 100,
+        2
+    ) AS source_completeness_pct,
 
-  SUM(CASE WHEN event_campaign IS NOT NULL THEN 1 ELSE 0 END) AS non_null_campaign_events,
+    ROUND(
+        SAFE_DIVIDE(
+            COUNTIF(event_medium IS NOT NULL),
+            COUNT(*)
+        ) * 100,
+        2
+    ) AS medium_completeness_pct,
 
-  ROUND(SUM(CASE WHEN event_source IS NOT NULL THEN 1 ELSE 0 END) \* 100.0 / COUNT(\*), 2) AS non_null_source_events_pct
+    ROUND(
+        SAFE_DIVIDE(
+            COUNTIF(event_campaign IS NOT NULL),
+            COUNT(*)
+        ) * 100,
+        2
+    ) AS campaign_completeness_pct
 
 FROM events_base
 
-GROUP BY 1;
+GROUP BY event_name
+
+ORDER BY total_events DESC;
 
 
-\-- What is the first non-null source/medium/campaign observed within each session?
 
-
-\-- For every unique session, return:
-
-\-- unique_session_id, the earliest timestamp in the session
-
-\-- the first non-null source, the first non-null medium, the first non-null campaign
-
+-- ============================================================
+-- 8. TRAFFIC-FIELD CO-OCCURRENCE
+-- ============================================================
 
 WITH events_base AS (
 
+    SELECT
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'source'
+        ) AS event_source,
 
-  SELECT
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'medium'
+        ) AS event_medium,
 
-    CONCAT(user_pseudo_id, '-', (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')) AS unique_session_id,
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'campaign'
+        ) AS event_campaign
 
-    event_timestamp,
+    FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
 
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'medium') AS event_medium,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source') AS event_source,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign') AS event_campaign
-
-  FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
-
-  WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
-
-
-),
-
-event_first_values AS (
-
-
-  SELECT
-
-    unique_session_id,
-
-    event_timestamp,
-
-    FIRST_VALUE(event_medium IGNORE NULLS)
-
-      OVER (
-
-        PARTITION BY unique_session_id ORDER BY event_timestamp
-
-        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-
-    ) AS first_value_non_null_medium,
-
-    FIRST_VALUE(event_source IGNORE NULLS)
-
-      OVER (
-
-        PARTITION BY unique_session_id ORDER BY event_timestamp
-
-        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-
-    ) AS first_value_non_null_source,
-
-    FIRST_VALUE(event_campaign IGNORE NULLS)
-
-      OVER (
-
-        PARTITION BY unique_session_id ORDER BY event_timestamp
-
-        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-
-    ) AS first_value_non_null_campaign
-
-
-  FROM events_base
-
+    WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
 )
 
-
 SELECT
-
-  unique_session_id,
-
-  MIN(event_timestamp) AS earliest_timestamp,
-
-  MIN(first_value_non_null_medium) AS first_non_null_medium,
-
-  MIN(first_value_non_null_source) AS first_non_null_source,
-
-  MIN(first_value_non_null_campaign) AS first_non_null_campaign
-
-FROM event_first_values
-
-GROUP BY 1;
-
-
-\-- How many sessions have a derived source, medium and campaign, and how many are still null after this derivation?
-
-
-\-- Return one row containing: total sessions, sessions with non-null source, sessions with null source, sessions with non-null medium
-
-\-- sessions with null medium, sessions with non-null campaign, sessions with null campaign
-
-
-WITH events_base AS (
-
-
-  SELECT
-
-    CONCAT(user_pseudo_id, '-', (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')) AS unique_session_id,
-
-    event_timestamp,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'medium') AS event_medium,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source') AS event_source,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign') AS event_campaign
-
-  FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
-
-  WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
-
-
-),
-
-event_first_values AS (
-
-
-  SELECT
-
-    unique_session_id,
-
-    event_timestamp,
-
-    FIRST_VALUE(event_medium IGNORE NULLS)
-
-      OVER (
-
-        PARTITION BY unique_session_id ORDER BY event_timestamp
-
-        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-
-    ) AS first_value_non_null_medium,
-
-    FIRST_VALUE(event_source IGNORE NULLS)
-
-      OVER (
-
-        PARTITION BY unique_session_id ORDER BY event_timestamp
-
-        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-
-    ) AS first_value_non_null_source,
-
-    FIRST_VALUE(event_campaign IGNORE NULLS)
-
-      OVER (
-
-        PARTITION BY unique_session_id ORDER BY event_timestamp
-
-        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-
-    ) AS first_value_non_null_campaign
-
-
-  FROM events_base
-
-),
-
-
-session_aggregation AS (
-
-
-  SELECT
-
-    unique_session_id,
-
-    MIN(event_timestamp) AS earliest_timestamp,
-
-    MIN(first_value_non_null_medium) AS first_non_null_medium,
-
-    MIN(first_value_non_null_source) AS first_non_null_source,
-
-    MIN(first_value_non_null_campaign) AS first_non_null_campaign
-
-  FROM event_first_values
-
-  GROUP BY 1
-
-
-)
-
-
-SELECT
-
-  COUNT(\*) AS total_sessions,
-
-  COUNT(CASE WHEN first_non_null_medium IS NOT NULL THEN unique_session_id END) AS sessions_with_non_null_medium,
-
-  COUNT(CASE WHEN first_non_null_medium IS NULL THEN unique_session_id END) AS sessions_with_null_medium,
-
-
-  COUNT(CASE WHEN first_non_null_source IS NOT NULL THEN unique_session_id END) AS sessions_with_non_null_source,
-
-  COUNT(CASE WHEN first_non_null_source IS NULL THEN unique_session_id END) AS sessions_with_null_source,
-
-
-  COUNT(CASE WHEN first_non_null_campaign IS NOT NULL THEN unique_session_id END) AS sessions_with_non_null_campaign,
-
-  COUNT(CASE WHEN first_non_null_campaign IS NULL THEN unique_session_id END) AS sessions_with_null_campaign
-
-FROM session_aggregation;
-
-
-\-- When traffic information appears on an event, do source, medium and campaign usually appear together?
-
-\-- For the event-level data, count:
-
-
-\-- events where source is non-null, events where medium is non-null, events where campaign is non-null, events where all three are non-null
-
-\-- events where source is non-null but medium is null, events where source is non-null but campaign is null
-
-\-- events where medium is non-null but source is null
-
-
-\-- Return just one row.
-
-
-WITH events_base AS (
-
-
-  SELECT
-
-    CONCAT(user_pseudo_id, '-', (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')) AS unique_session_id,
-
-    event_timestamp,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'medium') AS event_medium,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source') AS event_source,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign') AS event_campaign
-
-  FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
-
-  WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
-
-
-)
-
-
-SELECT
-
-  COUNT(CASE WHEN event_medium IS NOT NULL THEN unique_session_id END) AS non_null_medium_events,
-
-  COUNT(CASE WHEN event_source IS NOT NULL THEN unique_session_id END) AS non_null_source_events,
-
-  COUNT(CASE WHEN event_campaign IS NOT NULL THEN unique_session_id END) AS non_null_campaign_events,
-
-  COUNT(CASE WHEN event_campaign IS NOT NULL AND event_source IS NOT NULL AND
-
-    event_medium IS NOT NULL THEN unique_session_id END) AS non_null_medium_source_campaign_events,
-
-
-  COUNT(CASE WHEN event_source IS NOT NULL AND event_medium IS NULL THEN unique_session_id END) AS non_null_source_null_medium_events,
-
-  COUNT(CASE WHEN event_source IS NOT NULL AND event_campaign IS NULL THEN unique_session_id END) AS non_null_source_null_campaign_events,
-
-  COUNT(CASE WHEN event_medium IS NOT NULL AND event_source IS NULL THEN unique_session_id END) AS non_null_medium_null_source_events,
-
-  COUNT(CASE WHEN event_medium IS NOT NULL AND event_campaign IS NULL THEN unique_session_id END) AS non_null_medium_null_campaign_events,
-
-  COUNT(CASE WHEN event_campaign IS NOT NULL AND event_source IS NULL THEN unique_session_id END) AS non_null_campaign_null_source_events,
-
-  COUNT(CASE WHEN event_campaign IS NOT NULL AND event_medium IS NULL THEN unique_session_id END) AS non_null_campaign_null_medium_events
-
+    COUNT(*) AS total_events,
+
+    COUNTIF(event_source IS NOT NULL)
+        AS events_with_source,
+
+    COUNTIF(event_medium IS NOT NULL)
+        AS events_with_medium,
+
+    COUNTIF(event_campaign IS NOT NULL)
+        AS events_with_campaign,
+
+    COUNTIF(
+        event_source IS NOT NULL
+        AND event_medium IS NOT NULL
+        AND event_campaign IS NOT NULL
+    ) AS events_with_all_three,
+
+    COUNTIF(
+        event_source IS NOT NULL
+        AND event_medium IS NOT NULL
+    ) AS events_with_source_and_medium,
+
+    COUNTIF(
+        event_source IS NOT NULL
+        AND event_medium IS NULL
+    ) AS source_without_medium,
+
+    COUNTIF(
+        event_medium IS NOT NULL
+        AND event_source IS NULL
+    ) AS medium_without_source,
+
+    COUNTIF(
+        event_source IS NOT NULL
+        AND event_campaign IS NULL
+    ) AS source_without_campaign
 
 FROM events_base;
 
 
-\-- Build one row per session containing:
 
-
-\-- unique_session_id, earliest session timestamp, source from the first event in the session where at least one traffic field is present
-
-\-- medium from that same event, campaign from that same event
-
+-- ============================================================
+-- 9. SESSION-LEVEL ATTRIBUTION COVERAGE
+-- ============================================================
+-- A session is considered attributed when at least one event in
+-- the session contains both source and medium.
+--
+-- The first such event is used as the candidate traffic event.
+-- This same logic is used when building the session acquisition
+-- table in the next stage of the project.
 
 WITH events_base AS (
 
+    SELECT
+        user_pseudo_id,
 
-  SELECT
+        (
+            SELECT value.int_value
+            FROM UNNEST(event_params)
+            WHERE key = 'ga_session_id'
+        ) AS ga_session_id,
 
-    CONCAT(user_pseudo_id, '-', (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id')) AS unique_session_id,
+        event_timestamp,
 
-    user_pseudo_id,
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'source'
+        ) AS event_source,
 
-    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS ga_session_id,
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'medium'
+        ) AS event_medium,
 
-    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_number') AS ga_session_number,
+        (
+            SELECT value.string_value
+            FROM UNNEST(event_params)
+            WHERE key = 'campaign'
+        ) AS event_campaign
 
-    event_timestamp,
+    FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
 
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source') AS event_source,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'medium') AS event_medium,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign') AS event_campaign
-
-  FROM \`bigquery-public-data.ga4_obfuscated_sample_ecommerce.events\_\*\`
-
-  WHERE \_TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
-
-
+    WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
 ),
 
-events_ranked AS (
+sessionized AS (
 
+    SELECT
+        *,
 
-  SELECT
+        CONCAT(
+            user_pseudo_id,
+            '-',
+            CAST(ga_session_id AS STRING)
+        ) AS unique_session_id
 
-    unique_session_id,
+    FROM events_base
 
-    event_timestamp,
-
-    event_source,
-
-    event_medium,
-
-    event_campaign,
-
-    ROW_NUMBER() OVER (PARTITION BY unique_session_id ORDER BY event_timestamp) AS event_rn
-
-  FROM events_base
-
-  WHERE event_source IS NOT NULL AND event_medium IS NOT NULL
-
-
+    WHERE user_pseudo_id IS NOT NULL
+      AND ga_session_id IS NOT NULL
 ),
 
+all_sessions AS (
 
-final_traffic_sessions AS (
+    SELECT DISTINCT
+        unique_session_id
+    FROM sessionized
+),
 
+traffic_events_ranked AS (
 
-  SELECT
+    SELECT
+        unique_session_id,
+        event_timestamp,
+        event_source,
+        event_medium,
+        event_campaign,
 
-    unique_session_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY unique_session_id
+            ORDER BY event_timestamp
+        ) AS traffic_event_rank
+
+    FROM sessionized
+
+    WHERE event_source IS NOT NULL
+      AND event_medium IS NOT NULL
+),
+
+first_traffic_event AS (
+
+    SELECT
+        unique_session_id,
+        event_source AS session_source,
+        event_medium AS session_medium,
+        event_campaign AS session_campaign
+
+    FROM traffic_events_ranked
+
+    WHERE traffic_event_rank = 1
+),
+
+session_attribution AS (
+
+    SELECT
+        s.unique_session_id,
+        t.session_source,
+        t.session_medium,
+        t.session_campaign
+
+    FROM all_sessions AS s
+
+    LEFT JOIN first_traffic_event AS t
+        ON s.unique_session_id = t.unique_session_id
+)
+
+SELECT
+    COUNT(*) AS total_sessions,
+
+    COUNTIF(
+        session_source IS NOT NULL
+        AND session_medium IS NOT NULL
+    ) AS attributed_sessions,
+
+    COUNTIF(
+        session_source IS NULL
+        OR session_medium IS NULL
+    ) AS unattributed_sessions,
+
+    COUNTIF(session_campaign IS NOT NULL)
+        AS sessions_with_campaign,
+
+    ROUND(
+        SAFE_DIVIDE(
+            COUNTIF(
+                session_source IS NOT NULL
+                AND session_medium IS NOT NULL
+            ),
+            COUNT(*)
+        ) * 100,
+        2
+    ) AS attributed_sessions_pct,
+
+    ROUND(
+        SAFE_DIVIDE(
+            COUNTIF(
+                session_source IS NULL
+                OR session_medium IS NULL
+            ),
+            COUNT(*)
+        ) * 100,
+        2
+    ) AS unattributed_sessions_pct
+
+FROM session_attribution;
