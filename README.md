@@ -166,7 +166,7 @@ The Power BI report contains three analytical pages.
 
 ### 1. Marketing Performance Overview
 
-![Marketing Performance Overview](screenshots/performance-overview.png)
+![Marketing Performance Overview](screenshots/performance_overview.png)
 
 This page provides an overview of marketing and ecommerce performance, including:
 
@@ -185,7 +185,7 @@ Interactive filters allow the report to be explored by date range and acquisitio
 
 ### 2. Retention & Cohorts
 
-![Retention and Cohorts](screenshots/retention-cohorts.png)
+![Retention and Cohorts](screenshots/retention_cohorts.png)
 
 This page focuses on whether acquired users return after their initial visit.
 
@@ -202,7 +202,7 @@ Later cohorts without sufficient observation time are left blank rather than bei
 
 ### 3. Customer & Conversion Behaviour
 
-![Customer and Conversion Behaviour](screenshots/customer-conversion-behaviour.png)
+![Customer and Conversion Behaviour](screenshots/customer_conversion_behaviour.png)
 
 This page compares the commercial behaviour of new and returning users.
 
